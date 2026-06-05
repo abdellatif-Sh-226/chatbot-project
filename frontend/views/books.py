@@ -120,6 +120,78 @@ class BookDialog(tk.Toplevel):
         self.destroy()
 
 
+CARD_W = 210
+CARD_H = 340
+COLS = 4
+CARD_BG = "#ffffff"
+CARD_SEL_BG = "#e3f2fd"
+CARD_BORDER = "#e0e0e0"
+CARD_SEL_BORDER = COLORS["primary"]
+
+
+class BookCard(tk.Frame):
+    def __init__(self, parent, book, on_click):
+        super().__init__(parent, bg=CARD_BG, highlightbackground=CARD_BORDER, highlightthickness=1, width=CARD_W, height=CARD_H)
+        self.book = book
+        self.on_click = on_click
+        self.selected = False
+        self.pack_propagate(False)
+
+        inner = tk.Frame(self, bg=CARD_BG, padx=6, pady=6)
+        inner.pack(fill=tk.BOTH, expand=True)
+
+        self.cover = tk.Label(inner, bg="#f0f0f0", text="\U0001F4D6", font=("Segoe UI", 28), anchor="center")
+        self.cover.pack(fill=tk.X, pady=(0, 4))
+
+        title = book.get("titre", "Unknown")
+        author = book.get("auteur", "")
+        year = book.get("annee_publication") or ""
+        cat = book.get("categorie", "")
+        qty = book.get("quantite_disponible", 0)
+
+        tk.Label(inner, text=title, bg=CARD_BG, fg="#212121", font=("Segoe UI", 10, "bold"),
+                 wraplength=180, anchor="w", justify="left").pack(fill=tk.X, pady=(0, 1))
+        tk.Label(inner, text=author, bg=CARD_BG, fg="#616161", font=("Segoe UI", 9),
+                 wraplength=180, anchor="w").pack(fill=tk.X)
+        if year:
+            tk.Label(inner, text=str(year), bg=CARD_BG, fg="#9e9e9e", font=("Segoe UI", 8),
+                     anchor="w").pack(fill=tk.X)
+        tk.Label(inner, text=cat, bg=CARD_BG, fg=COLORS["primary"], font=("Segoe UI", 8),
+                 anchor="w").pack(fill=tk.X, pady=(1, 0))
+        tk.Label(inner, text=f"\U0001F4E6 {qty} available", bg=CARD_BG,
+                 fg="#388e3c" if qty > 0 else "#d32f2f",
+                 font=("Segoe UI", 8, "bold"), anchor="w").pack(fill=tk.X)
+
+        inner.bind("<Button-1>", self._click)
+        for child in inner.winfo_children():
+            child.bind("<Button-1>", self._click)
+        self.bind("<Button-1>", self._click)
+
+        self._load_cover()
+
+    def _load_cover(self):
+        photo_b64 = self.book.get("photo")
+        if not photo_b64:
+            return
+        try:
+            img_bytes = base64.b64decode(photo_b64)
+            img = Image.open(io.BytesIO(img_bytes))
+            img.thumbnail((CARD_W - 20, 160), Image.LANCZOS)
+            tk_img = ImageTk.PhotoImage(img)
+            self.cover.config(image=tk_img, text="")
+            self.cover.image = tk_img
+        except Exception:
+            pass
+
+    def _click(self, event=None):
+        self.on_click(self.book)
+
+    def set_selected(self, sel: bool):
+        self.selected = sel
+        self.config(highlightbackground=CARD_SEL_BORDER if sel else CARD_BORDER,
+                    bg=CARD_SEL_BG if sel else CARD_BG)
+
+
 class BooksView(tk.Frame):
     def __init__(self, parent, user_role="member"):
         super().__init__(parent)
@@ -127,7 +199,8 @@ class BooksView(tk.Frame):
         self.pack(fill=tk.BOTH, expand=True)
         self.current_page = 1
         self.user_role = user_role
-        self._photo_tk_ref = None
+        self.selected_book = None
+        self._card_refs = []
 
         toolbar = tk.Frame(self, bg=COLORS["card_bg"], highlightbackground=COLORS["card_border"], highlightthickness=1)
         toolbar.pack(fill=tk.X, padx=10, pady=(10, 0))
@@ -170,32 +243,19 @@ class BooksView(tk.Frame):
         ttk.Button(inner, text="Filter", command=self._search).pack(side=tk.LEFT, padx=2)
         ttk.Button(inner, text="Clear", command=self._clear_filters).pack(side=tk.LEFT, padx=2)
 
-        paned = tk.PanedWindow(self, orient=tk.HORIZONTAL, bg=COLORS["bg"], sashrelief=tk.FLAT, sashwidth=4)
-        paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        canvas_frame = tk.Frame(self, bg=COLORS["bg"])
+        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        left_frame = tk.Frame(paned, bg=COLORS["card_bg"], highlightbackground=COLORS["card_border"], highlightthickness=1)
-        columns = ("id", "titre", "auteur", "categorie", "annee", "qte", "statut")
-        self.tree = ttk.Treeview(left_frame, columns=columns, show="headings", selectmode="browse")
-        headings = {"id": "ID", "titre": "Title", "auteur": "Author", "categorie": "Category", "annee": "Year", "qte": "Qty", "statut": "Status"}
-        widths = {"id": 50, "titre": 250, "auteur": 200, "categorie": 120, "annee": 70, "qte": 60, "statut": 100}
-        for col in columns:
-            self.tree.heading(col, text=headings[col])
-            self.tree.column(col, width=widths[col])
-        scrollbar = ttk.Scrollbar(left_frame, orient=tk.VERTICAL, command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        paned.add(left_frame, stretch="always")
+        self.canvas = tk.Canvas(canvas_frame, bg=COLORS["bg"], highlightthickness=0)
+        v_scroll = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=v_scroll.set)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        right_frame = tk.Frame(paned, bg=COLORS["card_bg"], highlightbackground=COLORS["card_border"], highlightthickness=1, width=220)
-        tk.Label(right_frame, text="\U0001F4F7  Book Cover", font=("Segoe UI", 10, "bold"),
-                 bg=COLORS["card_bg"], fg=COLORS["text_primary"]).pack(pady=(10, 5))
-        sep = tk.Frame(right_frame, bg=COLORS["card_border"], height=1)
-        sep.pack(fill=tk.X, padx=10)
-        self.photo_label = tk.Label(right_frame, text="Select a book\nto view cover", font=("Segoe UI", 9),
-                                     bg="#f8f8f8", fg=COLORS["text_muted"], anchor="center", justify="center")
-        self.photo_label.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
-        paned.add(right_frame)
+        self.cards_container = tk.Frame(self.canvas, bg=COLORS["bg"])
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.cards_container, anchor="nw", tags="inner")
+        self.cards_container.bind("<Configure>", self._on_container_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
 
         paginator = tk.Frame(self, bg=COLORS["bg"])
         paginator.pack(fill=tk.X, padx=10, pady=(0, 10))
@@ -204,11 +264,16 @@ class BooksView(tk.Frame):
         ttk.Button(paginator, text="Next \u25B6", command=self._next_page).pack(side=tk.RIGHT, padx=2)
         ttk.Button(paginator, text="\u25C0 Prev", command=self._prev_page).pack(side=tk.RIGHT, padx=2)
 
-        self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self._refresh()
 
+    def _on_container_configure(self, event=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        self.canvas.itemconfig(self.canvas_window, width=event.width)
+
     def _build_url(self):
-        params = [("page", str(self.current_page)), ("per_page", "10")]
+        params = [("page", str(self.current_page)), ("per_page", "20")]
         if self.search_var.get().strip():
             params.append(("query", self.search_var.get().strip()))
         if self.cat_var.get():
@@ -223,19 +288,31 @@ class BooksView(tk.Frame):
             cats = list(data.get("categories", {}).keys())
             self.cat_combo["values"] = [""] + sorted(cats)
 
+    def _on_card_click(self, book):
+        self.selected_book = book
+        for card in self._card_refs:
+            card.set_selected(card.book.get("id_livre") == book.get("id_livre"))
+
     def _refresh(self):
-        for row in self.tree.get_children():
-            self.tree.delete(row)
+        for w in self.cards_container.winfo_children():
+            w.destroy()
+        self._card_refs.clear()
+        self.selected_book = None
         try:
             status, data = api_client.get(self._build_url())
             if status == 200:
-                for book in data.get("books", []):
-                    self.tree.insert("", tk.END, values=(
-                        book["id_livre"], book["titre"], book["auteur"],
-                        book["categorie"], book.get("annee_publication") or "",
-                        book["quantite_disponible"], book["statut"],
-                    ))
-                self.page_label.config(text=f"Page {data.get('page', 1)} / {data.get('total_pages', 1)}  |  {data.get('total', 0)} books total")
+                books = data.get("books", [])
+                total = data.get("total", 0)
+                page = data.get("page", 1)
+                total_pages = data.get("total_pages", 1)
+                for i, book in enumerate(books):
+                    card = BookCard(self.cards_container, book, self._on_card_click)
+                    card.grid(row=i // COLS, column=i % COLS, padx=4, pady=4)
+                    self._card_refs.append(card)
+                if not books:
+                    tk.Label(self.cards_container, text="\U0001F50D No books found", font=("Segoe UI", 14),
+                             bg=COLORS["bg"], fg=COLORS["text_muted"]).grid(row=0, column=0, padx=20, pady=40)
+                self.page_label.config(text=f"Page {page} / {total_pages}  |  {total} books total")
             else:
                 detail = data.get("detail", "Unknown error")
                 messagebox.showerror("API Error", f"Status {status}: {detail}")
@@ -263,44 +340,10 @@ class BooksView(tk.Frame):
             self._refresh()
 
     def _get_selected_book(self):
-        sel = self.tree.selection()
-        if not sel:
+        if not self.selected_book:
             messagebox.showinfo("Info", "Please select a book first.")
             return None
-        values = self.tree.item(sel[0], "values")
-        return {"id_livre": int(values[0]), "titre": values[1], "auteur": values[2], "categorie": values[3],
-                "annee_publication": int(values[4]) if values[4] else None,
-                "quantite_disponible": int(values[5]), "statut": values[6]}
-
-    def _on_select(self, event):
-        sel = self.tree.selection()
-        if not sel:
-            self.photo_label.config(text="Select a book\nto view cover", image="")
-            self._photo_tk_ref = None
-            return
-        try:
-            book_id = int(self.tree.item(sel[0], "values")[0])
-            status, data = api_client.get(f"/books/{book_id}")
-            if status == 200 and data.get("photo"):
-                self._display_photo(data["photo"])
-            else:
-                self.photo_label.config(text="No cover photo\navailable", image="")
-                self._photo_tk_ref = None
-        except Exception as e:
-            self.photo_label.config(text=f"Error:\n{e}", image="")
-            self._photo_tk_ref = None
-
-    def _display_photo(self, b64_str):
-        try:
-            img_bytes = base64.b64decode(b64_str)
-            img = Image.open(io.BytesIO(img_bytes))
-            img.thumbnail((200, 280), Image.LANCZOS)
-            tk_img = ImageTk.PhotoImage(img)
-            self.photo_label.config(image=tk_img, text="")
-            self._photo_tk_ref = tk_img
-        except Exception:
-            self.photo_label.config(text="Invalid image\nformat", image="")
-            self._photo_tk_ref = None
+        return self.selected_book
 
     def _reserve_book(self):
         book = self._get_selected_book()
