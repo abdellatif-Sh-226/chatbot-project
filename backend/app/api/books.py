@@ -22,9 +22,9 @@ def search_books(query: str = Query(..., min_length=1), db: Session = Depends(ge
 
 @router.get("/advanced", response_model=PaginatedBooks)
 def advanced_search(
-    query: Optional[str] = Query(None),
-    categorie: Optional[str] = Query(None),
-    statut: Optional[str] = Query(None),
+    query: str | None = Query(None),
+    categorie: str | None = Query(None),
+    statut: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),

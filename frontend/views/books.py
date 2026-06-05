@@ -1,5 +1,6 @@
 import io
 import base64
+import urllib.parse
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from PIL import Image, ImageTk
@@ -158,11 +159,13 @@ class BooksView(tk.Frame):
 
         tk.Label(inner, text="Category:", bg=COLORS["card_bg"], fg=COLORS["text_secondary"]).pack(side=tk.LEFT, padx=(10, 2))
         self.cat_var = tk.StringVar()
-        ttk.Combobox(inner, textvariable=self.cat_var, values=["", "roman", "science", "histoire", "informatique", "fiction"], width=10).pack(side=tk.LEFT, padx=2)
+        self.cat_combo = ttk.Combobox(inner, textvariable=self.cat_var, width=12)
+        self.cat_combo.pack(side=tk.LEFT, padx=2)
+        self._load_categories()
 
         tk.Label(inner, text="Status:", bg=COLORS["card_bg"], fg=COLORS["text_secondary"]).pack(side=tk.LEFT, padx=(10, 2))
         self.status_var = tk.StringVar()
-        ttk.Combobox(inner, textvariable=self.status_var, values=["", "disponible", "emprunt\u00e9", "r\u00e9serv\u00e9"], width=10).pack(side=tk.LEFT, padx=2)
+        ttk.Combobox(inner, textvariable=self.status_var, values=["", "disponible", "emprunt\u00e9", "r\u00e9serv\u00e9", "indisponible"], width=10).pack(side=tk.LEFT, padx=2)
 
         ttk.Button(inner, text="Filter", command=self._search).pack(side=tk.LEFT, padx=2)
         ttk.Button(inner, text="Clear", command=self._clear_filters).pack(side=tk.LEFT, padx=2)
@@ -205,14 +208,20 @@ class BooksView(tk.Frame):
         self._refresh()
 
     def _build_url(self):
-        params = [f"page={self.current_page}", "per_page=10"]
+        params = [("page", str(self.current_page)), ("per_page", "10")]
         if self.search_var.get().strip():
-            params.append(f"query={self.search_var.get().strip()}")
+            params.append(("query", self.search_var.get().strip()))
         if self.cat_var.get():
-            params.append(f"categorie={self.cat_var.get()}")
+            params.append(("categorie", self.cat_var.get()))
         if self.status_var.get():
-            params.append(f"statut={self.status_var.get()}")
-        return "/books/advanced?" + "&".join(params)
+            params.append(("statut", self.status_var.get()))
+        return "/books/advanced?" + urllib.parse.urlencode(params)
+
+    def _load_categories(self):
+        status, data = api_client.get("/stats/")
+        if status == 200:
+            cats = list(data.get("categories", {}).keys())
+            self.cat_combo["values"] = [""] + sorted(cats)
 
     def _refresh(self):
         for row in self.tree.get_children():
