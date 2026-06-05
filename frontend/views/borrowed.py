@@ -1,18 +1,23 @@
 import tkinter as tk
 from tkinter import ttk
 from frontend.api_client import api_client
+from frontend.styles import COLORS
 
 
 class BorrowedBooksView(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
+        self.configure(bg=COLORS["bg"])
         self.pack(fill=tk.BOTH, expand=True)
 
-        toolbar = ttk.Frame(self)
-        toolbar.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(toolbar, text="Refresh", command=self._refresh).pack(side=tk.LEFT, padx=2)
+        header = tk.Frame(self, bg=COLORS["card_bg"], highlightbackground=COLORS["card_border"], highlightthickness=1)
+        header.pack(fill=tk.X, padx=10, pady=(10, 0))
+        tk.Label(header, text="\U0001F4D6  My Borrowed Books", font=("Segoe UI", 14, "bold"),
+                 bg=COLORS["card_bg"], fg=COLORS["text_primary"]).pack(side=tk.LEFT, padx=15, pady=12)
+        tk.Label(header, text="Return books physically to the library before the due date!",
+                 font=("Segoe UI", 9), bg=COLORS["card_bg"], fg=COLORS["text_secondary"]).pack(side=tk.LEFT, padx=5)
 
-        ttk.Label(toolbar, text="  Your borrowed books — return them physically to the library before the due date!", font=("Segoe UI", 9), foreground="#7f8c8d").pack(side=tk.LEFT, padx=10)
+        ttk.Button(header, text="\u21bb Refresh", command=self._refresh).pack(side=tk.RIGHT, padx=10, pady=10)
 
         columns = ("id", "book", "borrowed", "due", "days_left", "status")
         self.tree = ttk.Treeview(self, columns=columns, show="headings", selectmode="browse")
@@ -21,16 +26,13 @@ class BorrowedBooksView(tk.Frame):
         for col in columns:
             self.tree.heading(col, text=headings[col])
             self.tree.column(col, width=widths[col])
-
-        self.tree.tag_configure("overdue", background="#fce4e4")
-        self.tree.tag_configure("warning", background="#fff9e6")
-        self.tree.tag_configure("ok", background="#e8f5e9")
-
+        self.tree.tag_configure("overdue", background=COLORS["danger_light"])
+        self.tree.tag_configure("warning", background=COLORS["warning_light"])
+        self.tree.tag_configure("ok", background=COLORS["success_light"])
         scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0), pady=5)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
-
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=10)
         self._refresh()
 
     def _refresh(self):
@@ -46,11 +48,8 @@ class BorrowedBooksView(tk.Frame):
                 status_text = "Active"
                 if days <= 0:
                     tag = "overdue"
-                    status_text = "Overdue!"
+                    status_text = "\u26A0 Overdue!"
                 elif days <= 3:
                     tag = "warning"
                     status_text = f"{days} days left"
-                self.tree.insert("", tk.END, values=(
-                    b["id"], b.get("book_title", ""), borrowed_str, due_str,
-                    days, status_text,
-                ), tags=(tag,))
+                self.tree.insert("", tk.END, values=(b["id"], b.get("book_title", ""), borrowed_str, due_str, days, status_text), tags=(tag,))

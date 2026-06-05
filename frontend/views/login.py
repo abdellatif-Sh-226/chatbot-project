@@ -1,71 +1,83 @@
-"""
-Login and Registration view for the Tkinter frontend.
-
-Provides a tabbed interface where users can log in with
-existing credentials or register a new account.
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 from frontend.api_client import api_client
+from frontend.styles import COLORS, setup_styles
 
 
 class LoginView(tk.Frame):
-    """
-    Frame containing login and register tabs.
-
-    On successful authentication the view calls the
-    on_login_success callback so the parent can switch
-    to the main dashboard.
-    """
-
-    def __init__(self, parent: tk.Frame, on_login_success):
+    def __init__(self, parent, on_login_success):
         super().__init__(parent)
         self.on_login_success = on_login_success
         self.role = "member"
         self.pack(fill=tk.BOTH, expand=True)
 
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=40, pady=40)
+        setup_styles()
 
-        # ---------- Login tab ----------
-        login_frame = ttk.Frame(notebook)
-        notebook.add(login_frame, text="Login")
+        self.configure(bg=COLORS["bg"])
 
-        ttk.Label(login_frame, text="Username:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        center = tk.Frame(self, bg=COLORS["bg"])
+        center.place(relx=0.5, rely=0.5, anchor="center")
+
+        card = tk.Frame(center, bg=COLORS["card_bg"], highlightbackground=COLORS["card_border"], highlightthickness=1)
+        card.pack(padx=20, pady=20)
+
+        tk.Label(card, text="\U0001F3EB", font=("Segoe UI", 36), bg=COLORS["card_bg"], fg=COLORS["primary"]).pack(pady=(20, 5))
+        tk.Label(card, text="Welcome to Smart Library", font=("Segoe UI", 18, "bold"), bg=COLORS["card_bg"], fg=COLORS["text_primary"]).pack()
+        tk.Label(card, text="Sign in to your account", font=("Segoe UI", 10), bg=COLORS["card_bg"], fg=COLORS["text_secondary"]).pack(pady=(0, 15))
+
+        notebook = ttk.Notebook(card, style="TNotebook")
+        notebook.pack(padx=30, pady=(0, 20))
+
+        login_frame = ttk.Frame(notebook, padding=20)
+        notebook.add(login_frame, text="  Login  ")
+
+        ttk.Label(login_frame, text="Username").pack(anchor="w")
         self.login_username = ttk.Entry(login_frame, width=30)
-        self.login_username.grid(row=0, column=1, padx=5, pady=5)
+        self.login_username.pack(fill=tk.X, pady=(2, 10))
 
-        ttk.Label(login_frame, text="Password:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        ttk.Label(login_frame, text="Password").pack(anchor="w")
         self.login_password = ttk.Entry(login_frame, show="*", width=30)
-        self.login_password.grid(row=1, column=1, padx=5, pady=5)
+        self.login_password.pack(fill=tk.X, pady=(2, 15))
 
-        ttk.Button(login_frame, text="Login", command=self._login).grid(row=2, column=0, columnspan=2, pady=15)
+        login_btn = tk.Button(login_frame, text="Sign In", bg=COLORS["primary"], fg="white",
+                              font=("Segoe UI", 11, "bold"), padx=20, pady=6, border=0, cursor="hand2",
+                              activebackground=COLORS["primary_hover"], activeforeground="white",
+                              command=self._login)
+        login_btn.pack(fill=tk.X)
+        login_btn.bind("<Enter>", lambda e: login_btn.config(bg=COLORS["primary_hover"]))
+        login_btn.bind("<Leave>", lambda e: login_btn.config(bg=COLORS["primary"]))
 
-        # ---------- Register tab ----------
-        reg_frame = ttk.Frame(notebook)
-        notebook.add(reg_frame, text="Register")
-
-        ttk.Label(reg_frame, text="Username:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        self.reg_username = ttk.Entry(reg_frame, width=30)
-        self.reg_username.grid(row=0, column=1, padx=5, pady=5)
-
-        ttk.Label(reg_frame, text="Email:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
-        self.reg_email = ttk.Entry(reg_frame, width=30)
-        self.reg_email.grid(row=1, column=1, padx=5, pady=5)
-
-        ttk.Label(reg_frame, text="Password:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
-        self.reg_password = ttk.Entry(reg_frame, show="*", width=30)
-        self.reg_password.grid(row=2, column=1, padx=5, pady=5)
-
-        ttk.Label(reg_frame, text="Confirm Password:").grid(row=3, column=0, padx=5, pady=5, sticky="e")
-        self.reg_confirm = ttk.Entry(reg_frame, show="*", width=30)
-        self.reg_confirm.grid(row=3, column=1, padx=5, pady=5)
-
-        ttk.Button(reg_frame, text="Register", command=self._register).grid(row=4, column=0, columnspan=2, pady=15)
-
-        # Allow pressing Enter to login
         self.login_password.bind("<Return>", lambda e: self._login())
+
+        reg_frame = ttk.Frame(notebook, padding=20)
+        notebook.add(reg_frame, text="  Register  ")
+
+        ttk.Label(reg_frame, text="Username").pack(anchor="w")
+        self.reg_username = ttk.Entry(reg_frame, width=30)
+        self.reg_username.pack(fill=tk.X, pady=(2, 10))
+
+        ttk.Label(reg_frame, text="Email").pack(anchor="w")
+        self.reg_email = ttk.Entry(reg_frame, width=30)
+        self.reg_email.pack(fill=tk.X, pady=(2, 10))
+
+        ttk.Label(reg_frame, text="Password").pack(anchor="w")
+        self.reg_password = ttk.Entry(reg_frame, show="*", width=30)
+        self.reg_password.pack(fill=tk.X, pady=(2, 10))
+
+        ttk.Label(reg_frame, text="Confirm Password").pack(anchor="w")
+        self.reg_confirm = ttk.Entry(reg_frame, show="*", width=30)
+        self.reg_confirm.pack(fill=tk.X, pady=(2, 15))
+
+        reg_btn = tk.Button(reg_frame, text="Create Account", bg=COLORS["success"], fg="white",
+                            font=("Segoe UI", 11, "bold"), padx=20, pady=6, border=0, cursor="hand2",
+                            activebackground="#15803d", activeforeground="white",
+                            command=self._register)
+        reg_btn.pack(fill=tk.X)
+        reg_btn.bind("<Enter>", lambda e: reg_btn.config(bg="#15803d"))
+        reg_btn.bind("<Leave>", lambda e: reg_btn.config(bg=COLORS["success"]))
+
+        tk.Label(card, text="Smart Library Management System v1.0", font=("Segoe UI", 8),
+                 bg=COLORS["card_bg"], fg=COLORS["text_muted"]).pack(pady=(0, 15))
 
     def _login(self):
         username = self.login_username.get().strip()
@@ -73,7 +85,6 @@ class LoginView(tk.Frame):
         if not username or not password:
             messagebox.showwarning("Validation", "Please enter username and password.")
             return
-
         status, data = api_client.post("/auth/login", {"username": username, "password": password})
         if status == 200:
             api_client.token = data["access_token"]
@@ -93,18 +104,13 @@ class LoginView(tk.Frame):
         email = self.reg_email.get().strip()
         password = self.reg_password.get()
         confirm = self.reg_confirm.get()
-
         if not username or not email or not password:
             messagebox.showwarning("Validation", "All fields are required.")
             return
         if password != confirm:
             messagebox.showwarning("Validation", "Passwords do not match.")
             return
-
-        status, data = api_client.post(
-            "/auth/register",
-            {"username": username, "email": email, "password": password},
-        )
+        status, data = api_client.post("/auth/register", {"username": username, "email": email, "password": password})
         if status == 201:
             messagebox.showinfo("Success", "Account created. You can now log in.")
         else:

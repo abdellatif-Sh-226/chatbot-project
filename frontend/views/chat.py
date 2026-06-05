@@ -1,77 +1,93 @@
-"""
-Chatbot view for the Tkinter frontend.
-
-Provides a chat-style interface where the user can type
-natural-language questions about the library and receive
-AI-generated answers.
-"""
-
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 from frontend.api_client import api_client
+from frontend.styles import COLORS
 
 
 class ChatView(tk.Frame):
-    """A messenger-style chatbot panel."""
-
     def __init__(self, parent):
         super().__init__(parent)
+        self.configure(bg=COLORS["bg"])
         self.pack(fill=tk.BOTH, expand=True)
 
-        # Chat display (read-only)
-        self.chat_area = scrolledtext.ScrolledText(
-            self, wrap=tk.WORD, state=tk.DISABLED,
-            font=("Segoe UI", 10), bg="#f5f5f5",
+        header = tk.Frame(self, bg=COLORS["card_bg"], highlightbackground=COLORS["card_border"], highlightthickness=1)
+        header.pack(fill=tk.X, padx=10, pady=(10, 0))
+        tk.Label(header, text="\U0001F916  Library Chatbot", font=("Segoe UI", 14, "bold"),
+                 bg=COLORS["card_bg"], fg=COLORS["text_primary"]).pack(side=tk.LEFT, padx=15, pady=12)
+        tk.Label(header, text="Ask me anything about books!", font=("Segoe UI", 9),
+                 bg=COLORS["card_bg"], fg=COLORS["text_secondary"]).pack(side=tk.LEFT, padx=5)
+
+        chat_frame = tk.Frame(self, bg="white", highlightbackground=COLORS["card_border"], highlightthickness=1)
+        chat_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        self.chat_area = tk.Text(
+            chat_frame, wrap=tk.WORD, state=tk.DISABLED,
+            font=("Segoe UI", 10), bg="#fafafa", fg=COLORS["text_primary"],
+            padx=15, pady=10, border=0, relief=tk.FLAT,
         )
-        self.chat_area.pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 0))
+        self.chat_area.pack(fill=tk.BOTH, expand=True)
 
-        # Tag styles for user / bot messages
-        self.chat_area.tag_config("user", foreground="#1a73e8", font=("Segoe UI", 10, "bold"))
-        self.chat_area.tag_config("bot", foreground="#333333", font=("Segoe UI", 10))
-        self.chat_area.tag_config("system", foreground="#999999", font=("Segoe UI", 9, "italic"))
-        self.chat_area.tag_config("source_tag", foreground="#888888", font=("Segoe UI", 8))
+        self.chat_area.tag_config("user", foreground=COLORS["primary"], font=("Segoe UI", 10, "bold"))
+        self.chat_area.tag_config("bot", foreground=COLORS["text_primary"], font=("Segoe UI", 10))
+        self.chat_area.tag_config("system", foreground=COLORS["text_muted"], font=("Segoe UI", 9, "italic"))
+        self.chat_area.tag_config("user_prefix", foreground=COLORS["primary"], font=("Segoe UI", 9, "bold"))
+        self.chat_area.tag_config("bot_prefix", foreground=COLORS["success"], font=("Segoe UI", 9, "bold"))
+        self.chat_area.tag_config("bot_bubble", background="#f0f7ff", lmargin1=10, lmargin2=10, rmargin=10)
+        self.chat_area.tag_config("user_bubble", background="#e8f5e9", lmargin1=10, lmargin2=10, rmargin=10)
 
-        # Input area
-        input_frame = ttk.Frame(self)
-        input_frame.pack(fill=tk.X, padx=5, pady=5)
+        input_area = tk.Frame(self, bg=COLORS["card_bg"], highlightbackground=COLORS["card_border"], highlightthickness=1)
+        input_area.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        inner = tk.Frame(input_area, bg=COLORS["card_bg"], padx=10, pady=10)
+        inner.pack(fill=tk.X)
 
         self.message_var = tk.StringVar()
-        self.entry = ttk.Entry(input_frame, textvariable=self.message_var, font=("Segoe UI", 10))
-        self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        self.entry = ttk.Entry(inner, font=("Segoe UI", 10))
+        self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
         self.entry.bind("<Return>", lambda e: self._send_message())
 
-        self.send_btn = ttk.Button(input_frame, text="Send", command=self._send_message)
+        self.send_btn = tk.Button(inner, text="\U000027A1  Send", bg=COLORS["primary"], fg="white",
+                                   font=("Segoe UI", 10, "bold"), border=0, padx=16, pady=6,
+                                   cursor="hand2", activebackground=COLORS["primary_hover"],
+                                   activeforeground="white", command=self._send_message)
         self.send_btn.pack(side=tk.RIGHT)
 
-        self._append_system("Welcome to the Library Chatbot! Ask me about books.")
+        self._append_system("Welcome to the Library Chatbot! Ask me about books, authors, or recommendations.")
 
-    def _append_message(self, text: str, tag: str):
-        """Insert a message into the chat scrollable text area."""
+    def _append_message(self, text, tag):
         self.chat_area.config(state=tk.NORMAL)
-        self.chat_area.insert(tk.END, text + "\n", tag)
+        self.chat_area.insert(tk.END, text + "\n\n", tag)
         self.chat_area.see(tk.END)
         self.chat_area.config(state=tk.DISABLED)
 
-    def _append_system(self, text: str):
-        self._append_message(f"🔹 {text}", "system")
+    def _append_system(self, text):
+        self.chat_area.config(state=tk.NORMAL)
+        self.chat_area.insert(tk.END, f"\U0001F539 {text}\n\n", "system")
+        self.chat_area.see(tk.END)
+        self.chat_area.config(state=tk.DISABLED)
 
-    def _append_user(self, text: str):
-        self._append_message(f"You: {text}", "user")
+    def _append_user(self, text):
+        self.chat_area.config(state=tk.NORMAL)
+        self.chat_area.insert(tk.END, "\U0001F464  You\n", "user_prefix")
+        self.chat_area.insert(tk.END, f"{text}\n\n", "user")
+        self.chat_area.see(tk.END)
+        self.chat_area.config(state=tk.DISABLED)
 
-    def _append_bot(self, text: str, source: str = ""):
-        prefix = "Bot" if not source or source == "ai" else f"Bot ({source})"
-        self._append_message(f"{prefix}: {text}", "bot")
+    def _append_bot(self, text, source=""):
+        self.chat_area.config(state=tk.NORMAL)
+        prefix = "\U0001F916  SmartLib" if not source or source == "ai" else f"\U0001F916  SmartLib ({source})"
+        self.chat_area.insert(tk.END, f"{prefix}\n", "bot_prefix")
+        self.chat_area.insert(tk.END, f"{text}\n\n", "bot")
+        self.chat_area.see(tk.END)
+        self.chat_area.config(state=tk.DISABLED)
 
     def _send_message(self):
-        """Send the user's message to the chatbot API."""
         message = self.message_var.get().strip()
         if not message:
             return
-
         self.message_var.set("")
         self._append_user(message)
         self.send_btn.config(state=tk.DISABLED)
-
         try:
             status, data = api_client.post("/chat/", {"message": message})
             if status == 200:

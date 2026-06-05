@@ -1,32 +1,20 @@
-"""
-Frontend entry point.
-
-Launches the Tkinter main window. Shows the login view
-first, then switches to the dashboard on success.
-"""
-
 import tkinter as tk
 from frontend.config import APP_TITLE, APP_GEOMETRY
 from frontend.views.login import LoginView
 from frontend.views.dashboard import DashboardView
+from frontend.styles import COLORS
 
 
 class Application(tk.Tk):
-    """
-    Root Tkinter application window.
-
-    Manages a single container that swaps between the
-    login view and the main dashboard.
-    """
-
     def __init__(self):
         super().__init__()
         self.title(APP_TITLE)
         self.geometry(APP_GEOMETRY)
         self.resizable(True, True)
+        self.configure(bg=COLORS["bg"])
+        self.minsize(900, 600)
 
-        # Container frame that holds the current view
-        self.container = tk.Frame(self)
+        self.container = tk.Frame(self, bg=COLORS["bg"])
         self.container.pack(fill=tk.BOTH, expand=True)
 
         self._current_view = None

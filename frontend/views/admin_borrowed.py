@@ -1,22 +1,27 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from frontend.api_client import api_client
+from frontend.styles import COLORS
 
 
 class AdminBorrowedView(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
+        self.configure(bg=COLORS["bg"])
         self.pack(fill=tk.BOTH, expand=True)
 
-        toolbar = ttk.Frame(self)
-        toolbar.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(toolbar, text="Refresh", command=self._refresh).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Return Book", command=self._return_book).pack(side=tk.LEFT, padx=2)
+        header = tk.Frame(self, bg=COLORS["card_bg"], highlightbackground=COLORS["card_border"], highlightthickness=1)
+        header.pack(fill=tk.X, padx=10, pady=(10, 0))
+        tk.Label(header, text="\U0001F4D5  Borrowed Books", font=("Segoe UI", 14, "bold"),
+                 bg=COLORS["card_bg"], fg=COLORS["text_primary"]).pack(side=tk.LEFT, padx=15, pady=12)
 
-        ttk.Label(toolbar, text="  Search user:").pack(side=tk.LEFT, padx=(20, 2))
+        ttk.Button(header, text="\u21bb Refresh", command=self._refresh).pack(side=tk.RIGHT, padx=10, pady=10)
+        ttk.Button(header, text="\U0001F4E4 Return Book", command=self._return_book).pack(side=tk.RIGHT, padx=5, pady=10)
+
+        tk.Label(header, text="Search user:", bg=COLORS["card_bg"], fg=COLORS["text_secondary"]).pack(side=tk.RIGHT, padx=(5, 2))
         self.search_var = tk.StringVar()
-        search_entry = ttk.Entry(toolbar, textvariable=self.search_var, width=20)
-        search_entry.pack(side=tk.LEFT, padx=2)
+        search_entry = ttk.Entry(header, textvariable=self.search_var, width=15)
+        search_entry.pack(side=tk.RIGHT, padx=2, pady=10)
         search_entry.bind("<Return>", lambda e: self._refresh())
 
         columns = ("id", "book", "user", "borrowed", "due", "days_left")
@@ -26,16 +31,13 @@ class AdminBorrowedView(tk.Frame):
         for col in columns:
             self.tree.heading(col, text=headings[col])
             self.tree.column(col, width=widths[col])
-
-        self.tree.tag_configure("overdue", background="#fce4e4")
-        self.tree.tag_configure("warning", background="#fff9e6")
-        self.tree.tag_configure("ok", background="#e8f5e9")
-
+        self.tree.tag_configure("overdue", background=COLORS["danger_light"])
+        self.tree.tag_configure("warning", background=COLORS["warning_light"])
+        self.tree.tag_configure("ok", background=COLORS["success_light"])
         scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0), pady=5)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
-
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=10)
         self._refresh()
 
     def _refresh(self):
@@ -53,12 +55,9 @@ class AdminBorrowedView(tk.Frame):
                     tag = "overdue"
                 elif days <= 3:
                     tag = "warning"
-                self.tree.insert("", tk.END, values=(
-                    b["id"], b.get("book_title", ""), b.get("username", ""),
+                self.tree.insert("", tk.END, values=(b["id"], b.get("book_title", ""), b.get("username", ""),
                     b.get("borrowed_at", "")[:10] if b.get("borrowed_at") else "",
-                    b.get("due_date", "")[:10] if b.get("due_date") else "",
-                    days,
-                ), tags=(tag,))
+                    b.get("due_date", "")[:10] if b.get("due_date") else "", days), tags=(tag,))
 
     def _get_selected(self):
         sel = self.tree.selection()
