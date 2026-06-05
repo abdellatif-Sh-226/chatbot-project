@@ -42,11 +42,7 @@ class AuthService:
         return user
 
     def login(self, data: LoginRequest) -> str:
-        """Authenticate user and return a JWT access token."""
         user = self.db.query(User).filter(User.username == data.username).first()
         if not user or not verify_password(data.password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password",
-            )
-        return create_access_token(data={"sub": user.username})
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+        return create_access_token(data={"sub": user.username, "role": user.role})

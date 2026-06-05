@@ -1,25 +1,10 @@
-"""
-Book and User ORM models for the library management system.
-
-Each model maps to a MySQL table. SQLAlchemy will
-automatically create these tables on application startup
-(see main.py lifespan).
-"""
-
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
 class Book(Base):
-    """
-    Represents a book in the library catalogue.
-
-    Fields match the project specification exactly:
-    id_livre, titre, auteur, categorie, annee_publication,
-    quantite_disponible, statut.
-    """
-
     __tablename__ = "books"
 
     id_livre = Column(Integer, primary_key=True, autoincrement=True)
@@ -31,24 +16,16 @@ class Book(Base):
     statut = Column(String(50), default="disponible", nullable=False)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    def __repr__(self) -> str:
+    reservations = relationship("Reservation", back_populates="book")
+    borrowed_books = relationship("BorrowedBook", back_populates="book")
+
+    def __repr__(self):
         return f"<Book(id={self.id_livre}, titre='{self.titre}')>"
 
 
 class User(Base):
-    """
-    Registered user who can authenticate via JWT.
-
-    Only administrators / librarians will use the system,
-    so this model is kept minimal.
-    """
-
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -56,8 +33,46 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    role = Column(String(20), default="member", nullable=False)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    def __repr__(self) -> str:
+    reservations = relationship("Reservation", back_populates="user")
+    borrowed_books = relationship("BorrowedBook", back_populates="user")
+
+    def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}')>"
+
+
+class Reservation(Base):
+    __tablename__ = "reservations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    book_id = Column(Integer, ForeignKey("books.id_livre"), nullable=False)
+    status = Column(String(20), default="pending", nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", back_populates="reservations")
+    book = relationship("Book", back_populates="reservations")
+
+    def __repr__(self):
+        return f"<Reservation(id={self.id}, user={self.user_id}, book={self.book_id})>"
+
+
+class BorrowedBook(Base):
+    __tablename__ = "borrowed_books"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    book_id = Column(Integer, ForeignKey("books.id_livre"), nullable=False)
+    borrowed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    due_date = Column(DateTime, nullable=False)
+    returned_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="borrowed_books")
+    book = relationship("Book", back_populates="borrowed_books")
+
+    def __repr__(self):
+        return f"<BorrowedBook(id={self.id}, user={self.user_id}, book={self.book_id})>"

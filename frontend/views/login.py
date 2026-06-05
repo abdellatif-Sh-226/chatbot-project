@@ -22,6 +22,7 @@ class LoginView(tk.Frame):
     def __init__(self, parent: tk.Frame, on_login_success):
         super().__init__(parent)
         self.on_login_success = on_login_success
+        self.role = "member"
         self.pack(fill=tk.BOTH, expand=True)
 
         notebook = ttk.Notebook(self)
@@ -76,7 +77,13 @@ class LoginView(tk.Frame):
         status, data = api_client.post("/auth/login", {"username": username, "password": password})
         if status == 200:
             api_client.token = data["access_token"]
-            self.on_login_success()
+            import jwt
+            try:
+                payload = jwt.decode(data["access_token"], options={"verify_signature": False})
+                role = payload.get("role", "member")
+            except Exception:
+                role = "member"
+            self.on_login_success(role)
         else:
             detail = data.get("detail", "Login failed")
             messagebox.showerror("Login Error", detail)

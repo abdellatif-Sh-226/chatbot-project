@@ -1,52 +1,76 @@
-"""
-Pydantic schemas for Book CRUD operations.
-
-Defines request validation models and response serialisation
-for every book-related endpoint.
-"""
-
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
 class BookBase(BaseModel):
-    """Shared fields used in create, update, and response schemas."""
-
-    titre: str = Field(..., min_length=1, max_length=255, description="Book title")
-    auteur: str = Field(..., min_length=1, max_length=255, description="Author name")
-    categorie: str = Field(..., max_length=100, description="Category (Roman, Science, ...)")
-    annee_publication: Optional[int] = Field(None, ge=1000, le=2100, description="Publication year")
-    quantite_disponible: int = Field(0, ge=0, description="Number of available copies")
-    statut: str = Field("disponible", pattern=r"^(disponible|emprunté|réservé)$", description="Book status")
+    titre: str = Field(..., min_length=1, max_length=255)
+    auteur: str = Field(..., min_length=1, max_length=255)
+    categorie: str = Field(..., max_length=100)
+    annee_publication: Optional[int] = Field(None, ge=1000, le=2100)
+    quantite_disponible: int = Field(0, ge=0)
+    statut: str = Field("disponible", pattern=r"^(disponible|emprunté|réservé|indisponible)$")
 
 
 class BookCreate(BookBase):
-    """Schema for creating a new book. All base fields are required."""
-
     pass
 
 
 class BookUpdate(BaseModel):
-    """Schema for updating a book. All fields are optional (partial update)."""
-
     titre: Optional[str] = Field(None, min_length=1, max_length=255)
     auteur: Optional[str] = Field(None, min_length=1, max_length=255)
     categorie: Optional[str] = Field(None, max_length=100)
     annee_publication: Optional[int] = Field(None, ge=1000, le=2100)
     quantite_disponible: Optional[int] = Field(None, ge=0)
-    statut: Optional[str] = Field(None, pattern=r"^(disponible|emprunté|réservé)$")
+    statut: Optional[str] = Field(None, pattern=r"^(disponible|emprunté|réservé|indisponible)$")
 
 
 class BookResponse(BookBase):
-    """Schema returned by the API when a book is created, updated, or fetched."""
-
     id_livre: int
+    model_config = {"from_attributes": True}
+
+
+class BookSearchAdvanced(BaseModel):
+    query: Optional[str] = Field(None, min_length=1)
+    categorie: Optional[str] = None
+    statut: Optional[str] = Field(None, pattern=r"^(disponible|emprunté|réservé|indisponible)$")
+    page: int = Field(1, ge=1)
+    per_page: int = Field(10, ge=1, le=100)
+
+
+class PaginatedBooks(BaseModel):
+    books: List[BookResponse]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+
+class ReservationCreate(BaseModel):
+    book_id: int
+
+
+class BorrowedBookResponse(BaseModel):
+    id: int
+    user_id: int
+    book_id: int
+    book_title: str = ""
+    username: str = ""
+    borrowed_at: datetime
+    due_date: datetime
+    returned_at: Optional[datetime] = None
+    days_remaining: Optional[int] = None
 
     model_config = {"from_attributes": True}
 
 
-class BookSearch(BaseModel):
-    """Query parameters for searching books."""
+class ReservationResponse(BaseModel):
+    id: int
+    user_id: int
+    book_id: int
+    status: str
+    created_at: datetime
+    book_title: str = ""
+    username: str = ""
 
-    query: str = Field(..., min_length=1, description="Search keyword for title, author, or ID")
+    model_config = {"from_attributes": True}

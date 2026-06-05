@@ -42,9 +42,9 @@ class Application(tk.Tk):
         self._clear()
         self._current_view = LoginView(self.container, on_login_success=self._show_dashboard)
 
-    def _show_dashboard(self):
+    def _show_dashboard(self, role="member"):
         self._clear()
-        self._current_view = DashboardView(self.container, on_logout=self._show_login)
+        self._current_view = DashboardView(self.container, on_logout=self._show_login, user_role=role)
 
 
 def main():

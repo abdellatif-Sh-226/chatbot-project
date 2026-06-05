@@ -20,32 +20,31 @@ class ChatService:
     def __init__(self, db: Session):
         self.db = db
         self._model = None
+        self._client = None
 
     # ------------------------------------------------------------------
     # AI API integration (Google Gemini)
     # ------------------------------------------------------------------
 
     def _get_gemini_model(self):
-        """Lazy-load the Gemini generative model if an API key is set."""
         if self._model is not None:
             return self._model
 
         if not settings.AI_API_KEY:
-            self._model = False  # Sentinel: no API key
+            self._model = False
             return None
 
         try:
-            import google.generativeai as genai
-
-            genai.configure(api_key=settings.AI_API_KEY)
-            self._model = genai.GenerativeModel(settings.AI_MODEL)
+            from google import genai
+            self._client = genai.Client(api_key=settings.AI_API_KEY)
+            self._model = settings.AI_MODEL
             return self._model
-        except Exception:
+        except Exception as e:
+            print(f"[ChatService] Failed to init Gemini client: {e}")
             self._model = False
             return None
 
     def _build_library_context(self) -> str:
-        """Return a text summary of all books in the catalogue."""
         books: List[Book] = self.db.query(Book).order_by(Book.id_livre).all()
         if not books:
             return "The library is currently empty."
@@ -60,25 +59,27 @@ class ChatService:
         return "\n".join(lines)
 
     def _ask_ai(self, user_message: str, context: str) -> Optional[str]:
-        """Send a prompt to Gemini and return the generated reply."""
-        model = self._get_gemini_model()
-        if not model:
+        model_name = self._get_gemini_model()
+        if not model_name:
             return None
 
         system_prompt = (
-            "You are a helpful library assistant. Answer the user's question "
-            "using ONLY the book data provided below. If the answer is not in "
-            "the data, say you don't have that information.\n\n"
+            "You are a library assistant named SmartLib. "
+            "Only introduce yourself if the user greets you. "
+            "Otherwise answer briefly and naturally. "
+            "Use ONLY the book data below.\n\n"
             f"Library catalogue:\n{context}"
         )
 
         try:
-            response = model.generate_content(
-                [system_prompt, user_message],
-                generation_config={"temperature": 0.3, "max_output_tokens": 512},
+            response = self._client.models.generate_content(
+                model=model_name,
+                contents=[system_prompt, user_message],
+                config={"temperature": 0.3, "max_output_tokens": 512},
             )
             return response.text.strip()
-        except Exception:
+        except Exception as e:
+            print(f"[ChatService] Gemini generate_content failed: {e}")
             return None
 
     # ------------------------------------------------------------------
@@ -166,19 +167,17 @@ class ChatService:
     # ------------------------------------------------------------------
 
     def ask(self, user_message: str) -> tuple[str, str]:
-        """
-        Process the user's natural-language question and return
-        a (reply, source) tuple.
-
-        source is 'ai' when the response came from Gemini,
-        'fallback' when the local keyword matcher was used.
-        """
+        print(f"[ChatService] ask() called with: '{user_message}'")
+        print(f"[ChatService] AI_API_KEY set: {bool(settings.AI_API_KEY)}")
+        print(f"[ChatService] AI_MODEL: {settings.AI_MODEL}")
         context = self._build_library_context()
+        print(f"[ChatService] Context length: {len(context)} chars")
 
-        # Try AI first
         ai_reply = self._ask_ai(user_message, context)
+        print(f"[ChatService] ai_reply: {ai_reply}")
         if ai_reply:
             return ai_reply, "ai"
 
-        # Fallback to keyword matching
-        return self._fallback_reply(user_message), "fallback"
+        reply = self._fallback_reply(user_message)
+        print(f"[ChatService] Using fallback: '{reply[:50]}...'")
+        return reply, "fallback"

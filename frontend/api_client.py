@@ -43,8 +43,11 @@ class ApiClient:
                 content = resp.read().decode("utf-8")
                 return resp.status, json.loads(content) if content else None
         except urllib.error.HTTPError as e:
-            content = e.read().decode("utf-8")
-            return e.code, json.loads(content) if content else {"detail": str(e)}
+            content = e.read().decode("utf-8", errors="replace")
+            try:
+                return e.code, json.loads(content) if content else {"detail": str(e)}
+            except json.JSONDecodeError:
+                return e.code, {"detail": content or str(e)}
 
     def get(self, path: str) -> tuple[int, Any]:
         return self._request("GET", path)
