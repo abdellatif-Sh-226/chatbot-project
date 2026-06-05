@@ -67,6 +67,8 @@ class AdminPanelView(tk.Frame):
         toolbar.pack(fill=tk.X, padx=10, pady=10)
         tk.Button(toolbar, text="\u21bb Refresh", bg=COLORS["primary"], fg="white", font=("Segoe UI", 9),
                   border=0, padx=12, pady=4, cursor="hand2", command=self._refresh_users).pack(side=tk.LEFT, padx=8, pady=8)
+        tk.Button(toolbar, text="\u2716 Delete Selected", bg=COLORS["danger"], fg="white", font=("Segoe UI", 9),
+                  border=0, padx=12, pady=4, cursor="hand2", command=self._delete_user).pack(side=tk.LEFT, padx=8, pady=8)
 
         columns = ("id", "username", "email", "role", "active")
         self.user_tree = ttk.Treeview(self.users_frame, columns=columns, show="headings", selectmode="browse")
@@ -87,3 +89,18 @@ class AdminPanelView(tk.Frame):
         if status == 200:
             for u in data:
                 self.user_tree.insert("", tk.END, values=(u["id"], u["username"], u["email"], u["role"], "Yes" if u["is_active"] else "No"))
+
+    def _delete_user(self):
+        selected = self.user_tree.selection()
+        if not selected:
+            return
+        values = self.user_tree.item(selected[0], "values")
+        user_id, username = values[0], values[1]
+        confirm = tk.messagebox.askyesno("Confirm Delete", f"Delete user \"{username}\" (ID: {user_id})?")
+        if not confirm:
+            return
+        status, _ = api_client.delete(f"/admin/users/{user_id}")
+        if status == 204:
+            self._refresh_users()
+        else:
+            tk.messagebox.showerror("Error", "Failed to delete user.")
