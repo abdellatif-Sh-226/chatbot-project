@@ -20,5 +20,8 @@ google-genai
 # Database driver
 pymysql
 
+# Image processing
+Pillow
+
 # Utilities
 python-dotenv

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
-from typing import Optional, List
-from pydantic import BaseModel, Field
+from typing import Optional, List, Any
+from pydantic import BaseModel, Field, field_validator
+import base64
 
 
 class BookBase(BaseModel):
@@ -10,6 +11,7 @@ class BookBase(BaseModel):
     annee_publication: Optional[int] = Field(None, ge=1000, le=2100)
     quantite_disponible: int = Field(0, ge=0)
     statut: str = Field("disponible", pattern=r"^(disponible|emprunté|réservé|indisponible)$")
+    photo: Optional[str] = Field(None, description="Base64-encoded image")
 
 
 class BookCreate(BookBase):
@@ -23,11 +25,19 @@ class BookUpdate(BaseModel):
     annee_publication: Optional[int] = Field(None, ge=1000, le=2100)
     quantite_disponible: Optional[int] = Field(None, ge=0)
     statut: Optional[str] = Field(None, pattern=r"^(disponible|emprunté|réservé|indisponible)$")
+    photo: Optional[str] = Field(None, description="Base64-encoded image (null to remove)")
 
 
 class BookResponse(BookBase):
     id_livre: int
     model_config = {"from_attributes": True}
+
+    @field_validator("photo", mode="before")
+    @classmethod
+    def bytes_to_b64(cls, v):
+        if isinstance(v, bytes):
+            return base64.b64encode(v).decode("utf-8")
+        return v
 
 
 class BookSearchAdvanced(BaseModel):

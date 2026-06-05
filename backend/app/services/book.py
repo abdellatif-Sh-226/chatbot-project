@@ -1,3 +1,4 @@
+import base64
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -10,7 +11,10 @@ class BookService:
         self.db = db
 
     def create(self, data: BookCreate) -> Book:
-        book = Book(**data.model_dump())
+        book_data = data.model_dump()
+        if book_data.get("photo"):
+            book_data["photo"] = base64.b64decode(book_data["photo"])
+        book = Book(**book_data)
         self.db.add(book)
         self.db.commit()
         self.db.refresh(book)
@@ -48,7 +52,10 @@ class BookService:
         if not book:
             return None
         for field, value in data.model_dump(exclude_unset=True).items():
-            setattr(book, field, value)
+            if field == "photo":
+                setattr(book, field, base64.b64decode(value) if value else None)
+            else:
+                setattr(book, field, value)
         self.db.commit()
         self.db.refresh(book)
         return book
