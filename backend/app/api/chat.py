@@ -20,9 +20,9 @@ router = APIRouter(prefix="/chat", tags=["Chatbot"])
 def chat(
     data: ChatRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Send a message to the AI library chatbot and get a reply."""
     service = ChatService(db)
-    reply, source = service.ask(data.message)
+    reply, source = service.ask(data.message, current_user)
     return ChatResponse(reply=reply, source=source)

@@ -1,4 +1,6 @@
 import tkinter as tk
+import threading
+import queue
 from tkinter import ttk, scrolledtext
 from frontend.api_client import api_client
 from frontend.styles import COLORS
@@ -42,7 +44,7 @@ class ChatView(tk.Frame):
         inner.pack(fill=tk.X)
 
         self.message_var = tk.StringVar()
-        self.entry = ttk.Entry(inner, font=("Segoe UI", 10))
+        self.entry = ttk.Entry(inner, textvariable=self.message_var, font=("Segoe UI", 10))
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
         self.entry.bind("<Return>", lambda e: self._send_message())
 
@@ -51,6 +53,9 @@ class ChatView(tk.Frame):
                                    cursor="hand2", activebackground=COLORS["primary_hover"],
                                    activeforeground="white", command=self._send_message)
         self.send_btn.pack(side=tk.RIGHT)
+
+        self._result_queue = queue.Queue()
+        self._poll_queue()
 
         self._append_system("Welcome to the Library Chatbot! Ask me about books, authors, or recommendations.")
 
@@ -81,6 +86,21 @@ class ChatView(tk.Frame):
         self.chat_area.see(tk.END)
         self.chat_area.config(state=tk.DISABLED)
 
+    def _poll_queue(self):
+        try:
+            while True:
+                result = self._result_queue.get_nowait()
+                kind, payload = result
+                if kind == "ok":
+                    status, data = payload
+                    self._handle_chat_response(status, data)
+                elif kind == "error":
+                    self._append_bot(f"Connection error: {payload}")
+                    self._re_enable_send()
+        except queue.Empty:
+            pass
+        self.after(100, self._poll_queue)
+
     def _send_message(self):
         message = self.message_var.get().strip()
         if not message:
@@ -88,17 +108,25 @@ class ChatView(tk.Frame):
         self.message_var.set("")
         self._append_user(message)
         self.send_btn.config(state=tk.DISABLED)
+        threading.Thread(target=self._do_chat_request, args=(message,), daemon=True).start()
+
+    def _do_chat_request(self, message):
         try:
             status, data = api_client.post("/chat/", {"message": message})
-            if status == 200:
-                reply = data.get("reply", "No response.")
-                source = data.get("source", "")
-                self._append_bot(reply, source)
-            else:
-                detail = data.get("detail", "Chat request failed.")
-                self._append_bot(f"Error: {detail}")
+            self._result_queue.put(("ok", (status, data)))
         except Exception as e:
-            self._append_bot(f"Connection error: {e}")
-        finally:
-            self.send_btn.config(state=tk.NORMAL)
-            self.entry.focus_set()
+            self._result_queue.put(("error", str(e)))
+
+    def _handle_chat_response(self, status, data):
+        if status == 200:
+            reply = data.get("reply", "No response.")
+            source = data.get("source", "")
+            self._append_bot(reply, source)
+        else:
+            detail = data.get("detail", "Chat request failed.")
+            self._append_bot(f"Error: {detail}")
+        self._re_enable_send()
+
+    def _re_enable_send(self):
+        self.send_btn.config(state=tk.NORMAL)
+        self.entry.focus_set()

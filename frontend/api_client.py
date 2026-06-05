@@ -39,7 +39,7 @@ class ApiClient:
             url, data=body, headers=self._headers(), method=method
         )
         try:
-            with urllib.request.urlopen(req) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:
                 content = resp.read().decode("utf-8")
                 return resp.status, json.loads(content) if content else None
         except urllib.error.HTTPError as e:
